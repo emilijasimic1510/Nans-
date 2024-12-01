@@ -1,0 +1,171 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+#**********************
+def sigmoid(x): 
+    return 1 / (1 + np.exp(-x))
+
+def sigmoid_derivative(x):
+    return x * (1 - x)
+
+# Napravimo klasu za NN mrežu
+class NeuralNetwork:
+    def __init__(self, input_size, hidden_size, output_size):
+        # Initialization of weights and biases
+        self.weights_input_hidden = np.random.rand(input_size, hidden_size)
+        self.biases_hidden = np.zeros((1, hidden_size))
+        self.weights_hidden_output = np.random.rand(hidden_size, output_size)
+        self.biases_output = np.zeros((1, output_size))
+
+        # Adam optimizer parameters
+        #******************************************************
+        self.beta1 = 0.8
+        self.beta2 = 0.9
+        self.epsilon = 1e-8
+
+        # Initialize Adam moment estimates
+        self.m_weights_input_hidden = np.zeros_like(self.weights_input_hidden)
+        self.v_weights_input_hidden = np.zeros_like(self.weights_input_hidden)
+        self.m_biases_hidden = np.zeros_like(self.biases_hidden)
+        self.v_biases_hidden = np.zeros_like(self.biases_hidden)
+
+        self.m_weights_hidden_output = np.zeros_like(self.weights_hidden_output)
+        self.v_weights_hidden_output = np.zeros_like(self.weights_hidden_output)
+        self.m_biases_output = np.zeros_like(self.biases_output)
+        self.v_biases_output = np.zeros_like(self.biases_output)
+
+    def forward(self, inputs):
+      # Propagate inputs through the network
+      self.hidden_layer_input = np.dot(inputs, self.weights_input_hidden) + self.biases_hidden
+      self.hidden_layer_output = sigmoid(self.hidden_layer_input)
+
+      self.output_layer_input = np.dot(self.hidden_layer_output, self.weights_hidden_output) + self.biases_output
+      self.predicted_output = sigmoid(self.output_layer_input)
+
+      return self.predicted_output
+
+    def backward(self, inputs, targets, learning_rate):
+        # Backward pass and weight update using Adam optimizer
+        error = targets - self.predicted_output
+
+        output_delta = error * sigmoid_derivative(self.predicted_output)
+        hidden_error = output_delta.dot(self.weights_hidden_output.T)
+        hidden_delta = hidden_error * sigmoid_derivative(self.hidden_layer_output)
+
+        # Update Adam moment estimates for hidden to output layer
+        self.m_weights_hidden_output = (self.beta1 * self.m_weights_hidden_output +
+                                        (1 - self.beta1) * self.hidden_layer_output.T.dot(output_delta))
+        self.v_weights_hidden_output = (self.beta2 * self.v_weights_hidden_output +
+                                        (1 - self.beta2) * np.square(self.hidden_layer_output.T.dot(output_delta)))
+
+        # Update weights and biases for hidden to output layer using Adam
+        m_hat_weights_hidden_output = self.m_weights_hidden_output / (1 - self.beta1)
+        v_hat_weights_hidden_output = self.v_weights_hidden_output / (1 - self.beta2)
+
+        self.weights_hidden_output += (m_hat_weights_hidden_output /
+                                       (np.sqrt(v_hat_weights_hidden_output) + self.epsilon)) * learning_rate
+
+        self.m_biases_output = (self.beta1 * self.m_biases_output +
+                                (1 - self.beta1) * np.sum(output_delta, axis=0, keepdims=True))
+        self.v_biases_output = (self.beta2 * self.v_biases_output +
+                                (1 - self.beta2) * np.square(np.sum(output_delta, axis=0, keepdims=True)))
+
+        m_hat_biases_output = self.m_biases_output / (1 - self.beta1)
+        v_hat_biases_output = self.v_biases_output / (1 - self.beta2)
+
+        self.biases_output += (m_hat_biases_output /
+                               (np.sqrt(v_hat_biases_output) + self.epsilon)) * learning_rate
+
+        # Update Adam moment estimates for input to hidden layer
+        self.m_weights_input_hidden = (self.beta1 * self.m_weights_input_hidden +
+                                       (1 - self.beta1) * inputs.T.dot(hidden_delta))
+        self.v_weights_input_hidden = (self.beta2 * self.v_weights_input_hidden +
+                                       (1 - self.beta2) * np.square(inputs.T.dot(hidden_delta)))
+
+        # Update weights and biases for input to hidden layer using Adam
+        m_hat_weights_input_hidden = self.m_weights_input_hidden / (1 - self.beta1)
+        v_hat_weights_input_hidden = self.v_weights_input_hidden / (1 - self.beta2)
+
+        self.weights_input_hidden += (m_hat_weights_input_hidden /
+                                      (np.sqrt(v_hat_weights_input_hidden) + self.epsilon)) * learning_rate
+
+        self.m_biases_hidden = (self.beta1 * self.m_biases_hidden +
+                                (1 - self.beta1) * np.sum(hidden_delta, axis=0, keepdims=True))
+        self.v_biases_hidden = (self.beta2 * self.v_biases_hidden +
+                                (1 - self.beta2) * np.square(np.sum(hidden_delta, axis=0, keepdims=True)))
+
+        m_hat_biases_hidden = self.m_biases_hidden / (1 - self.beta1)
+        v_hat_biases_hidden = self.v_biases_hidden / (1 - self.beta2)
+
+        self.biases_hidden += (m_hat_biases_hidden /
+                               (np.sqrt(v_hat_biases_hidden) + self.epsilon)) * learning_rate
+
+    def train(self, inputs, targets, epochs, learning_rate):
+        loss_history = []
+
+        for epoch in range(epochs):
+            # Forward pass
+            predicted_output = self.forward(inputs)
+
+            # Calculate and store loss
+            loss = np.mean(0.5 * (targets - predicted_output) ** 2)
+            loss_history.append(loss)
+
+            # Backward pass and weight update using Adam
+            self.backward(inputs, targets, learning_rate)
+
+            # Print the loss every 100 epochs
+            if epoch % 100 == 0:
+                print(f"Epoch {epoch}, Loss: {loss}")
+
+        return loss_history
+
+# Podatke veštački generišemo, uzmemo neke vrednosti za x,
+#izračunamo kolika bi bila vrednost izlaza iz funcije za te vrednosti dodamo malo "šuma" na to
+# sa ovim np.random.randn
+np.random.seed(42)
+X = 2 * np.random.rand(100, 1)
+#***************************************************
+y = 3 * X**2 + 2* X + np.random.rand(100, 1)
+
+# Normalizacija podataka
+#X_normalized = (X - X.mean()) / X.std()
+#y_normalized = (y - y.mean()) / y.std()
+X_normalized = (X - X.min()) / (X.max() - X.min())
+y_normalized = (y - y.min()) / (y.max() - y.min())
+# Hiperparametri NN mreže, tj parametri njene arhitekture
+#*******************************************************
+input_size = 1
+hidden_size = 3
+output_size = 1
+learning_rate = 0.05
+epochs = 400
+
+# Pravljenje modela mreže
+model = NeuralNetwork(input_size, hidden_size, output_size)
+loss_history = model.train(X_normalized, y_normalized, epochs, learning_rate)
+
+
+
+# Prikaz kako se menjala greška izlata pri procesu obuke
+
+plt.plot(loss_history)
+plt.title('GD Training Loss')
+
+plt.show()
+
+# Testiranje mreže na podacima koje mreža "nije videla", tj nad kojima nije trenirana
+X_test = np.linspace(X_normalized.min(), X_normalized.max(), 100).reshape(-1, 1)
+y_pred_gd = model.forward(X_test)
+
+
+# Uporedni prikaz stvarnih izlaznih podataka i onoga što je mreža predvidjela
+plt.figure(figsize=(10, 6))
+plt.scatter(X_normalized, y_normalized, label='True Data')
+plt.plot(X_test, y_pred_gd, label='SGD', linewidth=2)
+
+plt.title('Neural Network Regression ')
+plt.xlabel('Normalized X')
+plt.ylabel('Normalized y')
+plt.legend()
+plt.show()
