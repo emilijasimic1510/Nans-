@@ -1,0 +1,41 @@
+# Normalizacija podataka
+#X_normalized = (X - X.mean()) / X.std()
+#y_normalized = (y - y.mean()) / y.std()
+X_normalized = (X - X.min()) / (X.max() - X.min())
+y_normalized = (y - y.min()) / (y.max() - y.min())
+# Hiperparametri NN mreže, tj parametri njene arhitekture
+#*******************************************************
+input_size = 1
+hidden_size = 3
+output_size = 1
+learning_rate = 0.05
+epochs = 400
+
+# Pravljenje modela mreže
+model = NeuralNetwork(input_size, hidden_size, output_size)
+loss_history = model.train(X_normalized, y_normalized, epochs, learning_rate)
+
+
+
+# Prikaz kako se menjala greška izlata pri procesu obuke
+
+plt.plot(loss_history)
+plt.title('GD Training Loss')
+
+plt.show()
+
+# Testiranje mreže na podacima koje mreža "nije videla", tj nad kojima nije trenirana
+X_test = np.linspace(X_normalized.min(), X_normalized.max(), 100).reshape(-1, 1)
+y_pred_gd = model.forward(X_test)
+
+
+# Uporedni prikaz stvarnih izlaznih podataka i onoga što je mreža predvidjela
+plt.figure(figsize=(10, 6))
+plt.scatter(X_normalized, y_normalized, label='True Data')
+plt.plot(X_test, y_pred_gd, label='SGD', linewidth=2)
+
+plt.title('Neural Network Regression ')
+plt.xlabel('Normalized X')
+plt.ylabel('Normalized y')
+plt.legend()
+plt.show()
